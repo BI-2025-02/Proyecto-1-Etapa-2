@@ -1,0 +1,26 @@
+:root {
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --text: #0F172A;
+  --muted: #475569;
+  --border: #E2E8F0;
+  --primary: #2563EB;
+  --secondary: #10B981;
+}
+
+.dark {
+  --bg: #0B1220;
+  --surface: #111827;
+  --text: #E5E7EB;
+  --muted: #94A3B8;
+  --border: #1F2937;
+  --primary: #60A5FA;
+  --secondary: #34D399;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
