@@ -8,7 +8,7 @@ import {
 } from "../ui/table";
 import { MetricsGrid } from "./MetricsGrid";
 import { postJSON } from "../utils/api";
-import { parseCSV } from "../utils/csv";
+import { parseTrainingFile } from "../utils/csv";
 
 type TrainingStatus = "idle" | "training" | "success" | "error";
 
@@ -47,11 +47,13 @@ export function TrainingView() {
     }, 200);
 
     try {
-      const text = await file.text();
-      const { textos, labels } = parseCSV(text);
+      // parseTrainingFile devuelve TrainingData[] con {text,label}
+      const parsed = await parseTrainingFile(file);
+      const textos = parsed.map((r) => r.text);
+      const labels = parsed.map((r) => r.label);
 
       if (!textos.length || !labels.length || textos.length !== labels.length) {
-        throw new Error("CSV inválido. Debe tener columnas text,label y misma cantidad de filas.");
+        throw new Error("Archivo inválido: no se extrajeron filas válidas con 'text' y 'label'.");
       }
 
       // Llamada al backend: /retrain

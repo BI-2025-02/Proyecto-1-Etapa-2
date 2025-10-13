@@ -5,6 +5,7 @@ import { Card } from "../ui/card";
 import { EmptyState } from "./EmptyState";
 import { ResultCard } from "./ResultCard";
 import { postJSON, type PredictPayload, type PredictResponse } from "../utils/api";
+import { splitTextsByParagraphs } from "../utils/textSplitter";
 
 type UiResult = {
   predictedClass: string;
@@ -28,7 +29,12 @@ export function PredictorView() {
     const t0 = performance.now();
 
     try {
-      const payload: PredictPayload = { textos: [text] };
+      const textos = splitTextsByParagraphs(text);
+      if (textos.length === 0) {
+        throw new Error("No hay textos para clasificar.");
+      }
+
+      const payload: PredictPayload = { textos };
       const data = await postJSON<PredictResponse>("/predict", payload);
 
       const pred = String(data.predicciones?.[0] ?? "");
