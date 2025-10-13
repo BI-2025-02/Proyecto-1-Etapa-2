@@ -10,10 +10,10 @@ export interface PredictionResult {
 }
 
 export function ResultCard({
-  result,
+  results,
   isLoading,
 }: {
-  result: PredictionResult | null;
+  results: PredictionResult[] | null;
   isLoading: boolean;
 }) {
   if (isLoading) {
@@ -34,23 +34,34 @@ export function ResultCard({
     );
   }
 
-  if (!result) return null;
+  if (!results || results.length === 0) return null;
 
   return (
     <div className="space-y-8">
       <Card className="p-8">
         <div className="mb-6">
-          <div className="text-3xl mb-2" style={{ color: "var(--primary)" }}>
-            {result.predictedClass}
-          </div>
-          <p className="text-sm text-muted-foreground">Categoría ODS predicha</p>
+            <div className="text-3xl mb-2" style={{ color: "var(--primary)" }}>
+              Resultado ({results.length}):
+            </div>
+            <p className="text-sm text-muted-foreground">Categoría ODS predicha por párrafo</p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="bg-surface border border-border" style={{ color: "var(--primary)" }}>
-            Confianza {Number.isFinite(result.confidence) ? result.confidence!.toFixed(2) : "—"}
-          </Badge>
-          <Badge variant="outline">t={result.predictionTime}ms</Badge>
+        <div className="space-y-4">
+          {results.map((r, idx) => (
+            <Card key={idx} className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">Párrafo {idx + 1}</div>
+                  <div className="text-2xl" style={{ color: "var(--primary)" }}>{r.predictedClass}</div>
+                </div>
+                <div className="flex flex-col items-end">
+                  <Badge variant="secondary" className="bg-surface border border-border" style={{ color: "var(--primary)" }}>
+                    Confianza {Number.isFinite(r.confidence as number) ? (r.confidence as number)!.toFixed(2) : "—"}
+                  </Badge>
+                  <Badge variant="outline">t={r.predictionTime}ms</Badge>
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </Card>
     </div>

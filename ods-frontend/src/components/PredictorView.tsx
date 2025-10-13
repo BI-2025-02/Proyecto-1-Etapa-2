@@ -15,7 +15,7 @@ type UiResult = {
 
 export function PredictorView() {
   const [text, setText] = useState("");
-  const [result, setResult] = useState<UiResult | null>(null);
+  const [result, setResult] = useState<UiResult[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -37,14 +37,17 @@ export function PredictorView() {
       const payload: PredictPayload = { textos };
       const data = await postJSON<PredictResponse>("/predict", payload);
 
-      const pred = String(data.predicciones?.[0] ?? "");
-      const conf = typeof data.probabilidades?.[0] === "number" ? data.probabilidades![0] : null;
+      const preds = Array.isArray(data.predicciones) ? data.predicciones : [data.predicciones];
+      const probs = Array.isArray(data.probabilidades) ? data.probabilidades : undefined;
+      const timeSpent = Math.round(performance.now() - t0);
 
-      setResult({
-        predictedClass: pred,
-        confidence: conf,
-        predictionTime: Math.round(performance.now() - t0),
-      });
+      const uiResults: UiResult[] = preds.map((p, i) => ({
+        predictedClass: String(p ?? ""),
+        confidence: typeof probs?.[i] === "number" ? probs![i] : null,
+        predictionTime: timeSpent,
+      }));
+
+      setResult(uiResults);
     } catch (e: unknown) {
       if (e instanceof Error) {
         setErr(e.message);
@@ -117,7 +120,7 @@ export function PredictorView() {
               />
             </Card>
           ) : (
-            <ResultCard result={result} isLoading={isLoading} />
+            <ResultCard results={result} isLoading={isLoading} />
           )}
         </div>
       </div>

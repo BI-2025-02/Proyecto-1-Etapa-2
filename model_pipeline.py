@@ -7,8 +7,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CURRENT_MODEL_PATH = os.path.join(BASE_DIR, "../models/model_current.joblib")
-CURRENT_VECTORIZER_PATH = os.path.join(BASE_DIR, "../models/tfidf_current.joblib")
+CURRENT_MODEL_PATH = os.path.join(BASE_DIR, "./models/model_current.joblib")
+CURRENT_VECTORIZER_PATH = os.path.join(BASE_DIR, "./models/tfidf_current.joblib")
 
 
 def build_pipeline():

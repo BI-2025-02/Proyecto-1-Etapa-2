@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.metrics import (accuracy_score, classification_report,
                              precision_recall_fscore_support)
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 from model_pipeline import build_pipeline, load_current_model, save_model
 
@@ -28,7 +31,8 @@ class PredictionInput(BaseModel):
 
 class RetrainInput(BaseModel):
     textos: list[str]
-    labels: list[int]
+    # Accept labels as strings too (Excel/CSV commonly contains text labels)
+    labels: list[str]
     
 @app.get("/health", summary="Estado de la API", tags=["Sistema"])
 def health():
@@ -48,34 +52,51 @@ def predict(data: PredictionInput):
 
 @app.post("/retrain")
 def retrain(data: RetrainInput):
+    # Debug: log basic info about incoming payload
     try:
-        model, vectorizer = load_current_model()
-    except FileNotFoundError:
-        print("No se encontró un modelo existente. Construyendo uno nuevo.")
-        model = build_pipeline()
-        vectorizer = model.named_steps["tfidf"]
+        print(f"/retrain received textos={len(data.textos)} labels={len(data.labels)} sample_label={data.labels[0] if data.labels else 'N/A'}")
+    except Exception:
+        pass
+    # Convert inputs
+    textos = list(data.textos)
+    y = list(data.labels)
 
-    X_new = vectorizer.transform(data.textos)
-    y_new = data.labels
+    if len(textos) < 2:
+        return {"mensaje": "Se requieren al menos 2 ejemplos para reentrenar."}
 
-    model.fit(X_new, y_new)
-    save_model(model, vectorizer)
+    # Prepare split; if only one class present, do non-stratified split
+    unique_labels = set(y)
+    stratify = y if len(unique_labels) > 1 else None
 
-    # Predicciones sobre el mismo set usado para fit (métricas de entrenamiento)
-    y_pred = model.predict(X_new)
+    try:
+        X_train_texts, X_test_texts, y_train, y_test = train_test_split(
+            textos, y, test_size=0.2, random_state=42, stratify=stratify
+        )
+    except ValueError:
+        X_train_texts, X_test_texts, y_train, y_test = train_test_split(
+            textos, y, test_size=0.2, random_state=42
+        )
 
-    # Macro (promedio por clases, mismo peso por clase)
-    prec_macro, rec_macro, f1_macro, _ = precision_recall_fscore_support(
-        y_new, y_pred, average="macro", zero_division=0
-    )
+    # Fit vectorizer on training data only
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=3, max_df=0.9, sublinear_tf=True, norm="l2")
+    X_train = vectorizer.fit_transform(X_train_texts)
+    X_test = vectorizer.transform(X_test_texts)
 
-    # (Opcional) otras vistas útiles:
-    acc = accuracy_score(y_new, y_pred)
-    prec_micro, rec_micro, f1_micro, _ = precision_recall_fscore_support(y_new, y_pred, average="micro", zero_division=0)
-    prec_w, rec_w, f1_w, _ = precision_recall_fscore_support(y_new, y_pred, average="weighted", zero_division=0)
+    clf = LogisticRegression(max_iter=2000, class_weight="balanced", random_state=42, solver="lbfgs")
+    clf.fit(X_train, y_train)
 
-    # Reporte por clase (si lo quieres mantener)
-    report = classification_report(y_new, y_pred, output_dict=True, zero_division=0)
+    # Save model and vectorizer
+    save_model(clf, vectorizer)
+
+    # Evaluate on held-out test set
+    y_pred = clf.predict(X_test)
+
+    prec_macro, rec_macro, f1_macro, _ = precision_recall_fscore_support(y_test, y_pred, average="macro", zero_division=0)
+    acc = accuracy_score(y_test, y_pred)
+    prec_micro, rec_micro, f1_micro, _ = precision_recall_fscore_support(y_test, y_pred, average="micro", zero_division=0)
+    prec_w, rec_w, f1_w, _ = precision_recall_fscore_support(y_test, y_pred, average="weighted", zero_division=0)
+
+    report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
 
     return {
         "mensaje": "Modelo reentrenado y actualizado",
@@ -83,14 +104,16 @@ def retrain(data: RetrainInput):
             "precision_macro": prec_macro,
             "recall_macro": rec_macro,
             "f1_macro": f1_macro,
-            "accuracy": acc,                 # ← descomenta si lo quieres
-            "precision_micro": prec_micro,   # ← opcional
-            "recall_micro": rec_micro,       # ← opcional
-            "f1_micro": f1_micro,            # ← opcional
-            "precision_weighted": prec_w,    # ← opcional
-            "recall_weighted": rec_w,        # ← opcional
-            "f1_weighted": f1_w,              # ← opcional
-            "classification_report": report    # sigue disponible por clase
-        }
+            "accuracy": acc,
+            "precision_micro": prec_micro,
+            "recall_micro": rec_micro,
+            "f1_micro": f1_micro,
+            "precision_weighted": prec_w,
+            "recall_weighted": rec_w,
+            "f1_weighted": f1_w,
+            "classification_report": report,
+        },
+        "train_size": len(X_train_texts),
+        "test_size": len(X_test_texts),
     }
 

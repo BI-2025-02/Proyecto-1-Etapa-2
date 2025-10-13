@@ -35,23 +35,46 @@ async function parseCSV(file: File): Promise<TrainingData[]> {
           return reject(new Error("El archivo CSV está vacío o no contiene filas con datos."));
         }
 
+        const textKeys = ["text", "texto", "textos", "texts", "message", "mensaje", "descripcion", "contenido"];
+        const labelKeys = ["label", "labels", "etiqueta", "etiquetas", "class", "categoria", "cat", "category"];
+
         const parsed = rows
           .map((row) => {
             // Normalizar keys a minúsculas para búsqueda flexible
-              const lower: Record<string, unknown> = {};
-              Object.keys((row || {}) as Record<string, unknown>).forEach((k) => {
-                lower[k.toLowerCase().trim()] = (row as Record<string, unknown>)[k];
-              });
+            const lower: Record<string, unknown> = {};
+            const values: unknown[] = [];
+            Object.keys((row || {}) as Record<string, unknown>).forEach((k) => {
+              const v = (row as Record<string, unknown>)[k];
+              lower[k.toLowerCase().trim()] = v;
+              values.push(v);
+            });
 
-            const text =
-              lower["text"] ?? lower["texto"] ?? lower["message"] ?? "";
-            const label = lower["label"] ?? lower["etiqueta"] ?? lower["class"] ?? "";
+            const findFirst = (keys: string[]) => {
+              for (const k of keys) {
+                const val = lower[k];
+                if (val !== undefined && val !== null && String(val).trim() !== "") return val;
+              }
+              return undefined;
+            };
 
-            return { text: String(text).trim(), label: String(label).trim() };
+            let text = findFirst(textKeys);
+            let label = findFirst(labelKeys);
+
+            // Fallback: si no hay encabezados válidos, usar primera y segunda columna por índice
+            if ((text === undefined || String(text).trim() === "") && values.length >= 1) {
+              text = String(values[0] ?? "");
+            }
+            if ((label === undefined || String(label).trim() === "") && values.length >= 2) {
+              label = String(values[1] ?? "");
+            }
+
+            return { text: String(text ?? "").trim(), label: String(label ?? "").trim() };
           })
           .filter((r) => r.text.length > 0 && r.label.length > 0);
 
         if (parsed.length === 0) {
+          const headers = rows && rows[0] ? Object.keys(rows[0]) : [];
+          console.warn("CSV parser: no rows parsed. Available headers:", headers);
           return reject(
             new Error(
               "No se encontraron columnas válidas 'text' y 'label' con datos. Asegúrate de que el CSV tenga encabezados y que las filas contengan texto y etiqueta."
@@ -82,21 +105,44 @@ async function parseExcel(file: File): Promise<TrainingData[]> {
         return reject(new Error("El archivo Excel está vacío."));
       }
 
+      const textKeys = ["text", "texto", "textos", "texts", "message", "mensaje", "descripcion", "contenido"];
+      const labelKeys = ["label", "labels", "etiqueta", "etiquetas", "class", "categoria", "cat", "category"];
+
       const parsed = rows
         .map((row) => {
           const lower: Record<string, unknown> = {};
+          const values: unknown[] = [];
           Object.keys((row || {}) as Record<string, unknown>).forEach((k) => {
-            lower[k.toLowerCase().trim()] = (row as Record<string, unknown>)[k];
+            const v = (row as Record<string, unknown>)[k];
+            lower[k.toLowerCase().trim()] = v;
+            values.push(v);
           });
 
-          const text = lower["text"] ?? lower["texto"] ?? lower["message"] ?? "";
-          const label = lower["label"] ?? lower["etiqueta"] ?? lower["class"] ?? "";
+          const findFirst = (keys: string[]) => {
+            for (const k of keys) {
+              const val = lower[k];
+              if (val !== undefined && val !== null && String(val).trim() !== "") return val;
+            }
+            return undefined;
+          };
 
-          return { text: String(text).trim(), label: String(label).trim() };
+          let text = findFirst(textKeys);
+          let label = findFirst(labelKeys);
+
+          if ((text === undefined || String(text).trim() === "") && values.length >= 1) {
+            text = String(values[0] ?? "");
+          }
+          if ((label === undefined || String(label).trim() === "") && values.length >= 2) {
+            label = String(values[1] ?? "");
+          }
+
+          return { text: String(text ?? "").trim(), label: String(label ?? "").trim() };
         })
         .filter((r) => r.text.length > 0 && r.label.length > 0);
 
       if (parsed.length === 0) {
+        const headersX = rows && rows[0] ? Object.keys(rows[0]) : [];
+        console.warn("Excel parser: no rows parsed. Available headers:", headersX);
         return reject(
           new Error(
             "No se encontraron columnas válidas 'text' y 'label' con datos en el Excel. Asegúrate de que la primera hoja tenga encabezados y filas con datos."

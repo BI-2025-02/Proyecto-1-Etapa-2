@@ -89,8 +89,17 @@ export function TrainingView() {
       // reporte por clase (si viene en response.report con el formato de sklearn)
       // Esperado (output_dict=True):
       // { "No Poverty": {precision, recall, f1-score, support}, "macro avg": {...}, "weighted avg": {...} }
-      if (response?.report && typeof response.report === "object") {
-        const report = response.report as Record<string, unknown>;
+      // Try several locations where the backend might provide the per-class report:
+      // - response.report
+      // - response.classification_report
+      // - response.metrics.classification_report
+      const reportCandidate =
+        (asRecord(response)?.report as Record<string, unknown> | undefined) ??
+        (asRecord(response)?.classification_report as Record<string, unknown> | undefined) ??
+        (metrics && (asRecord(metrics)?.classification_report as Record<string, unknown> | undefined));
+
+      if (reportCandidate && typeof reportCandidate === "object") {
+        const report = reportCandidate as Record<string, unknown>;
         const rows: ClassRow[] = Object.entries(report)
           .filter(([key]) => key !== "accuracy" && !key.includes("avg")) // solo clases
           .map(([label, metrics]) => {
@@ -138,7 +147,7 @@ export function TrainingView() {
                 type="file"
                 id="file-upload"
                 className="hidden"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileChange}
               />
               <label htmlFor="file-upload">
