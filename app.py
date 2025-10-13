@@ -2,8 +2,9 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sklearn.metrics import classification_report
-from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score
+from sklearn.metrics import (accuracy_score, classification_report,
+                             precision_recall_fscore_support)
+
 from model_pipeline import build_pipeline, load_current_model, save_model
 
 app = FastAPI(title="API Clasificación ODS1", version="1.0")
@@ -28,6 +29,15 @@ class PredictionInput(BaseModel):
 class RetrainInput(BaseModel):
     textos: list[str]
     labels: list[int]
+    
+@app.get("/health", summary="Estado de la API", tags=["Sistema"])
+def health():
+    try:
+        model, _ = load_current_model()
+        return {"status": "ok", "model_loaded": True}
+    except Exception as e:
+        return {"status": "error", "model_loaded": False, "detail": str(e)}
+
 
 @app.post("/predict")
 def predict(data: PredictionInput):
